@@ -16,8 +16,7 @@ g++ -o demo demo.cpp
 
 ```
 ## Demo
-<img src="./screenshots/ss2.png" alt="example"/>
-<img src="./screenshots/ss1.png" alt="example"/>
+<img src="./screenshots/ss3.png" alt="example"/>
 
 # TODO:
 - [x] implement attributes

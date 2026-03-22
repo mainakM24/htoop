@@ -5,56 +5,78 @@
 
 using namespace htoop;
 
+Node get_styles() {
+    Node style("style");
+    Stylesheet css;
+
+    css.select("body")
+	.set("font-family", "monospace")
+	.set("font-size", "20px")
+	.set("background", "#181818")
+	.set("color", "white")
+	.set("margin", "0")
+	.set("padding", "20px");
+
+    css.select(".header")
+	.set("color", "#38bdf8")
+	.set("text-align", "center")
+	.set("font-size", "40px");
+
+    style.append(css.to_string());
+    return style;
+}
+
+Node Header(const std::string &title) {
+    return Div({
+	    H1(title)
+	}).attr("class", "header");
+}
+
+Node Features() {
+    return Div({
+	    H1("Features"),
+		UL({
+			LI("HTML-less Web"),
+			LI("Component System"),
+			LI("Custom HTML Builder"),
+			LI("Supports Self-closing tags"),
+			LI("Attribute system"),
+			LI("CSS builder")
+		    })
+	});
+}
+
+Node Extra() {
+    return Div({
+	    Node("button").append("click me"),
+	    IMG().attr("src", "https://picsum.photos/id/103/300/200")
+	});
+}
+
+Node App() {
+    return Div({
+	    Header("HTOOP"),
+	    H1("HTOOP: Web in C++").attr("class", "header"),
+	    Features(),
+	    Extra()
+	});
+}
+
+
 int main(void)
 {
-    Node style("style");
-    style.append(R"(
-    body {
-	font-family: monospace;
-	font-size: 20px;
-	background: #181818;
-	color: white;
-	margin: 0;
-	padding: 10px;
-    }
-    .header {
-	color: #38bdf8;
-	text-align: center;
-	font-size: 40px;
-    }
-    h1 {
-	text-align: center;
-	color: #38bdf8;
-    }
-    )");
-
     Node home("html");
     Node head("head");
     Node body("body");
-
     Node title("title");
-    title.append("HTOOP");
 
+    title.append("HTOOP");
     head.append(title);
+
+    Node style = get_styles();
     head.append(style);
 
-    Node header("div");
-    header.attr("class", "header");
-    header.append("HTOOP");
-
-    Node hero("h1");
-    hero.append("HTOOP: Web in C++");
-
-    Node ul("ul");
-    ul.append(Node("li").append("Features"));
-    ul.append(Node("li").append("HTML-less Web"));
-    ul.append(Node("li").append("Custom HTML Builder"));
-    ul.append(Node("li").append("Self-closing tags"));
-    ul.append(Node("li").append("Attribute system"));
-
-    body.append(header);
-    body.append(hero);
-    body.append(ul);
+    body.append(App());
 
     home.append(head);
     home.append(body);
@@ -69,3 +91,4 @@ int main(void)
 
     return 0;
 }
+
