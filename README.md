@@ -5,21 +5,22 @@ C++ <3 HTML
 ## Build
 - windows 
 ```bash
-g++ -o html html.cpp -lws2_32
-.\html.exe
+g++ -o demo demo.cpp -lws2_32
+.\demo.exe
 
 ```
 - linux 
 ```bash
-g++ -o html html.cpp 
-./html
+g++ -o demo demo.cpp 
+./demo
 
 ```
 ## Demo
+<img src="./screenshots/ss2.png" alt="example"/>
 <img src="./screenshots/ss1.png" alt="example"/>
 
 # TODO:
-- [ ] implement attributes
+- [x] implement attributes
 - [ ] implement other tags
 - [ ] improve the architechture
 - [x] implement the server (Used lib)
