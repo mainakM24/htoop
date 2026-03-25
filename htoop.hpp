@@ -7,6 +7,20 @@
 #include <unordered_map>
 
 namespace htoop {
+    std::string escape(const std::string& text) {
+	std::string result;
+	for (char c : text) {
+	    switch(c) {
+	    case '&': result += "&amp;"; break;
+	    case '<': result += "&lt;"; break;
+	    case '>': result += "&gt;"; break;
+	    case '"': result += "&quot;"; break;
+	    default: result += c;
+	    }
+	}
+	return result;
+    }
+
     class Node {
     private:
 	std::vector<Node> children;
@@ -37,14 +51,14 @@ namespace htoop {
 	// }
 
 	// self closing
-	static Node self(std::string tag) {
+	static Node Self(std::string tag) {
 	    return Node(tag, true);
 	}
 
 	// text block
 	static Node Text(const std::string& t) {
 	    Node node("");
-	    node.text = t;
+	    node.text = escape(t);
 	    return node;
 	}
 
@@ -76,6 +90,21 @@ namespace htoop {
 	// --- attributes ---
 	Node& attr(const std::string& key, const std::string& value) {
 	    attributes[key] = value;
+	    return *this;
+	}
+
+	// set id
+	inline Node& set_id(const std::string id) {
+	    //TODO: check for overwrite
+	    attributes["id"] = id;
+	    return *this;
+	}
+
+	// add class
+	inline Node& add_class(const std::string cls) {
+	    std::string curr = attributes["class"];
+	    if (!curr.empty()) curr += " ";
+	    attributes["class"] = curr + cls;
 	    return *this;
 	}
 
@@ -173,6 +202,7 @@ namespace htoop {
 	}
     };
 
+
 // --- HELPER FUNCTIONS ---
 
     // Generic builder
@@ -184,8 +214,52 @@ namespace htoop {
 	return n;
     }
 
+    inline Node Html(std::vector<Node> children = {}) {
+	return create("html", children);
+    }
+
+    inline Node Body(std::vector<Node> children = {}) {
+	return create("body", children);
+    }
+
+    inline Node Head(std::vector<Node> children = {}) {
+	return create("head", children);
+    }
+
+    inline Node Title(const std::string& title) {
+	return create("title", { Node::Text(title) });
+    }
+
+    inline Node Script(std::vector<Node> children = {}) {
+	return create("script", children);
+    }
+
+    inline Node Style(std::string css) {
+	return create("style", { Node::Text(css) });
+    }
+
     inline Node Div(std::vector<Node> children = {}) {
 	return create("div", children);
+    }
+
+    inline Node A(const std::string& text, const std::string& href) {
+	return create("a", { Node::Text(text) }).attr("href", href);
+    }
+
+    inline Node Header(std::vector<Node> children = {}) {
+	return create("header", children);
+    }
+
+    inline Node Footer(std::vector<Node> children = {}) {
+	return create("footer", children);
+    }
+
+    inline Node Section(std::vector<Node> children = {}) {
+	return create("section", children);
+    }
+
+    inline Node Main(std::vector<Node> children = {}) {
+	return create("main", children);
     }
 
     inline Node H1(const std::string& text) {
@@ -204,8 +278,12 @@ namespace htoop {
 	return create("li", { Node::Text(text) });
     }
 
-    inline Node IMG() {
-	return Node::self("img");
+    inline Node Button(const std::string& text) {
+	return create("button", { Node::Text(text) });
+    }
+
+    inline Node IMG(const std::string& src) {
+	return Node::Self("img").attr("src", src);
     }
 }
 

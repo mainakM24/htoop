@@ -18,9 +18,16 @@ g++ -o demo demo.cpp
 ## Demo
 <img src="./screenshots/ss3.png" alt="example"/>
 
+## Snippet
+<img src="./screenshots/ss4.png" alt="snippet"/>
+
 # TODO:
 - [x] implement attributes
-- [ ] implement other tags
+- [x] implement other tags
 - [ ] improve the architechture
 - [x] implement the server (Used lib)
 - [x] remove the intermediate step (html less)
+- [ ] implement Node find/find_by_id/find_by_class
+- [ ] implement conditional rendering append_if
+- [ ] variable interpolation: replace {{key}} with value
+- [ ] form element implement

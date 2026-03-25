@@ -5,10 +5,8 @@
 
 using namespace htoop;
 
-Node get_styles() {
-    Node style("style");
+std::string get_styles() {
     Stylesheet css;
-
     css.select("body")
 	.set("font-family", "monospace")
 	.set("font-size", "20px")
@@ -21,42 +19,43 @@ Node get_styles() {
 	.set("color", "#38bdf8")
 	.set("text-align", "center")
 	.set("font-size", "40px");
-
-    style.append(css.to_string());
-    return style;
+    return css.to_string();
 }
 
 Node Header(const std::string &title) {
     return Div({
 	    H1(title)
-	}).attr("class", "header");
+	}).add_class("header")
+	.set_id("hdr")
+	.add_class("cont");
 }
 
 Node Features() {
     return Div({
 	    H1("Features"),
-		UL({
-			LI("HTML-less Web"),
-			LI("Component System"),
-			LI("Custom HTML Builder"),
-			LI("Supports Self-closing tags"),
-			LI("Attribute system"),
-			LI("CSS builder")
-		    })
+	    UL({
+		    LI("HTML-less Web"),
+		    LI("Component System"),
+		    LI("Custom HTML Builder"),
+		    LI("Supports Self-closing tags"),
+		    LI("Attribute system"),
+		    LI("CSS builder")
+		})
 	});
 }
 
 Node Extra() {
     return Div({
-	    Node("button").append("click me"),
-	    IMG().attr("src", "https://picsum.photos/id/103/300/200")
+	    Button("Click Me"),
+	    IMG("https://picsum.photos/id/103/300/200"),
+	    A("Htoop: Github Link", "https://github.com/mainakM24/htoop")
 	});
 }
 
 Node App() {
     return Div({
 	    Header("HTOOP"),
-	    H1("HTOOP: Web in C++").attr("class", "header"),
+	    H1("HTOOP: Web in <C++>").attr("class", "header"),
 	    Features(),
 	    Extra()
 	});
@@ -65,30 +64,17 @@ Node App() {
 
 int main(void)
 {
-    Node home("html");
-    Node head("head");
-    Node body("body");
-    Node title("title");
-
-    title.append("HTOOP");
-    head.append(title);
-
-    Node style = get_styles();
-    head.append(style);
-
-    body.append(App());
-
-    home.append(head);
-    home.append(body);
+    Node home_page = Html({
+	    Head({ Title("HTOOP"), Style(get_styles()) }),
+	    Body({ App() })
+	});
 
     httplib::Server svr;
-    svr.Get("/", [&home](const httplib::Request &, httplib::Response &res) {
-	res.set_content(home.to_string(), "text/html");
+    svr.Get("/", [&home_page](const httplib::Request &, httplib::Response &res) {
+	res.set_content(home_page.to_string(), "text/html");
     });
 
     std::cout << "Listening on port 8080\n";
     svr.listen("0.0.0.0", 8080);
-
     return 0;
 }
-

@@ -1,32 +1,74 @@
 #define _WIN32_WINNT 0x0A00
 #include <string>
-#include "./include/httplib.h"
 #include "htoop.hpp"
+
+using namespace htoop;
+
+std::string get_styles() {
+    Stylesheet css;
+    css.select("body")
+	.set("font-family", "monospace")
+	.set("font-size", "20px")
+	.set("background", "#181818")
+	.set("color", "white")
+	.set("margin", "0")
+	.set("padding", "20px");
+
+    css.select(".header")
+	.set("color", "#38bdf8")
+	.set("text-align", "center")
+	.set("font-size", "40px");
+    return css.to_string();
+}
+
+Node Header(const std::string &title) {
+    return Div({
+	    H1(title)
+	}).add_class("header")
+	.set_id("hdr")
+	.add_class("cont");
+}
+
+Node Features() {
+    return Div({
+	    H1("Features"),
+	    UL({
+		    LI("HTML-less Web"),
+		    LI("Component System"),
+		    LI("Custom HTML Builder"),
+		    LI("Supports Self-closing tags"),
+		    LI("Attribute system"),
+		    LI("CSS builder")
+		})
+	});
+}
+
+Node Extra() {
+    return Div({
+	    Button("Click Me"),
+	    IMG("https://picsum.photos/id/103/300/200"),
+	    A("Htoop: Github Link", "https://github.com/mainakM24/httop")
+	});
+}
+
+Node App() {
+    return Div({
+	    Header("HTOOP"),
+	    H1("HTOOP: Web in <C++>").attr("class", "header"),
+	    Features(),
+	    Extra()
+	});
+}
+
 
 int main(void)
 {
-    httplib::Server svr;
-    htoop::Node root = htoop::Node("html");
-    htoop::Node head = htoop::Node("head");
-    htoop::Node body = htoop::Node("body");
+    Node home_page = Html({
+	    Head({ Title("HTOOP"), Style(get_styles()) }),
+	    Body({ App() })
+	});
 
-    body.append(htoop::Node("h1", "This is generated from cpp"));
-    body.append(htoop::Node("h2", "This is h2"));
-    body.append("<ul>\
-		<li> This is </li>\
-		<li> Literal html </li>\
-		</ul>");
-
-    body.append("<h1 style=\"color: blue;\">CSS is not implemented yet!!</h1>");
-    body.append(htoop::Node("button", "No html file needed"));
-    root.append(body);
-
-    svr.Get("/", [&root](const httplib::Request &, httplib::Response &res) {
-	res.set_content(root.to_string(), "text/html");
-    });
-
-    std::cout << "Listening on port 8080\n";
-    svr.listen("0.0.0.0", 8080);
+    std::cout << home_page.to_string();
 
     return 0;
 }
