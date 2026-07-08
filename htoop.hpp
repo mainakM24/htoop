@@ -5,9 +5,12 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <stdexcept>
+#include <algorithm>
+#include <cctype>
 
 namespace htoop {
-    std::string escape(const std::string& text) {
+    inline std::string escape(const std::string& text) {
 	std::string result;
 	for (char c : text) {
 	    switch(c) {
@@ -34,25 +37,14 @@ namespace htoop {
 	}
 
     public:
-	// --- constructor ---
-	Node(std::string tag) {
-	    this->tag = tag;
-	}
+	// --- constructors ---
+	explicit Node(std::string tag) : tag(std::move(tag)) {}
 
-	Node(std::string tag, bool sc) {
-	    this->tag = tag;
-	    this->self_closing = sc;
-	}
+	Node(std::string tag, bool sc) : tag(std::move(tag)), self_closing(sc) {}
 
-	// Not working properly
-	// Node(std::string tag, std::string text) {
-	//     this->tag = tag;
-	//     this->append(text);
-	// }
-
-	// self closing
+	// self closing builder helper
 	static Node Self(std::string tag) {
-	    return Node(tag, true);
+	    return Node(std::move(tag), true);
 	}
 
 	// text block
@@ -62,28 +54,57 @@ namespace htoop {
 	    return node;
 	}
 
+	// raw text (unescaped, e.g. for style/script tags)
+	static Node RawText(std::string raw_html) {
+	    Node node("");
+	    node.text = std::move(raw_html);
+	    return node;
+	}
+
 	// --- append ---
 	Node& append(const Node& node) {
 	    if (self_closing) {
-		std::cerr << __FILE__ << ":";
-		std::cerr << std::to_string(__LINE__) << ":" << __FUNCTION__ << "() => ";
-		std::cerr << "ERROR: can't append to -> " << tag << std::endl;
-		std::exit(1);
+		throw std::logic_error("ERROR: can't append to self-closing tag: " + tag);
 	    }
 	    children.push_back(node);
 	    return *this;
 	}
 
-	Node& append(const std::string& text) {
+	Node& append(Node&& node) {
 	    if (self_closing) {
-		std::cerr << __FILE__ << ":";
-		std::cerr << std::to_string(__LINE__) << ":" << __FUNCTION__ << "() => ";
-		std::cerr << "ERROR: can't append to " << tag << std::endl;
-		std::exit(1);
+		throw std::logic_error("ERROR: can't append to self-closing tag: " + tag);
 	    }
-	    // Node text_node("");
-	    // text_node.text = text;
-	    children.push_back(Node::Text(text));
+	    children.push_back(std::move(node));
+	    return *this;
+	}
+
+	Node& append(const std::string& t) {
+	    if (self_closing) {
+		throw std::logic_error("ERROR: can't append to self-closing tag: " + tag);
+	    }
+	    children.push_back(Node::Text(t));
+	    return *this;
+	}
+
+	// --- conditional rendering ---
+	Node& append_if(bool condition, const Node& node) {
+	    if (condition) {
+		return append(node);
+	    }
+	    return *this;
+	}
+
+	Node& append_if(bool condition, Node&& node) {
+	    if (condition) {
+		return append(std::move(node));
+	    }
+	    return *this;
+	}
+
+	Node& append_if(bool condition, const std::string& t) {
+	    if (condition) {
+		return append(t);
+	    }
 	    return *this;
 	}
 
@@ -94,21 +115,132 @@ namespace htoop {
 	}
 
 	// set id
-	inline Node& set_id(const std::string id) {
-	    //TODO: check for overwrite
+	inline Node& set_id(const std::string& id) {
 	    attributes["id"] = id;
 	    return *this;
 	}
 
 	// add class
-	inline Node& add_class(const std::string cls) {
-	    std::string curr = attributes["class"];
+	inline Node& add_class(const std::string& cls) {
+	    std::string& curr = attributes["class"];
 	    if (!curr.empty()) curr += " ";
-	    attributes["class"] = curr + cls;
+	    curr += cls;
 	    return *this;
 	}
 
-	// --- render ---
+	// --- find / DOM query API ---
+	Node* find_by_id(const std::string& id) {
+	    auto it = attributes.find("id");
+	    if (it != attributes.end() && it->second == id) {
+		return this;
+	    }
+	    for (auto& child : children) {
+		if (Node* found = child.find_by_id(id)) {
+		    return found;
+		}
+	    }
+	    return nullptr;
+	}
+
+	const Node* find_by_id(const std::string& id) const {
+	    auto it = attributes.find("id");
+	    if (it != attributes.end() && it->second == id) {
+		return this;
+	    }
+	    for (const auto& child : children) {
+		if (const Node* found = child.find_by_id(id)) {
+		    return found;
+		}
+	    }
+	    return nullptr;
+	}
+
+	std::vector<Node*> find_by_class(const std::string& class_name) {
+	    std::vector<Node*> matches;
+	    find_by_class_helper(class_name, matches);
+	    return matches;
+	}
+
+	std::vector<const Node*> find_by_class(const std::string& class_name) const {
+	    std::vector<const Node*> matches;
+	    find_by_class_helper(class_name, matches);
+	    return matches;
+	}
+
+    private:
+	void find_by_class_helper(const std::string& class_name, std::vector<Node*>& matches) {
+	    auto it = attributes.find("class");
+	    if (it != attributes.end()) {
+		const std::string& cls_val = it->second;
+		size_t pos = 0;
+		while ((pos = cls_val.find(class_name, pos)) != std::string::npos) {
+		    bool start_ok = (pos == 0 || std::isspace(static_cast<unsigned char>(cls_val[pos - 1])));
+		    bool end_ok = (pos + class_name.length() == cls_val.length() || 
+				   std::isspace(static_cast<unsigned char>(cls_val[pos + class_name.length()])));
+		    if (start_ok && end_ok) {
+			matches.push_back(this);
+			break;
+		    }
+		    pos += class_name.length();
+		}
+	    }
+	    for (auto& child : children) {
+		child.find_by_class_helper(class_name, matches);
+	    }
+	}
+
+	void find_by_class_helper(const std::string& class_name, std::vector<const Node*>& matches) const {
+	    auto it = attributes.find("class");
+	    if (it != attributes.end()) {
+		const std::string& cls_val = it->second;
+		size_t pos = 0;
+		while ((pos = cls_val.find(class_name, pos)) != std::string::npos) {
+		    bool start_ok = (pos == 0 || std::isspace(static_cast<unsigned char>(cls_val[pos - 1])));
+		    bool end_ok = (pos + class_name.length() == cls_val.length() || 
+				   std::isspace(static_cast<unsigned char>(cls_val[pos + class_name.length()])));
+		    if (start_ok && end_ok) {
+			matches.push_back(this);
+			break;
+		    }
+		    pos += class_name.length();
+		}
+	    }
+	    for (const auto& child : children) {
+		child.find_by_class_helper(class_name, matches);
+	    }
+	}
+
+    public:
+	// --- variable interpolation ---
+	Node& interpolate(const std::unordered_map<std::string, std::string>& vars) {
+	    if (!text.empty()) {
+		for (const auto& [key, value] : vars) {
+		    std::string placeholder = "{{" + key + "}}";
+		    size_t pos = 0;
+		    while ((pos = text.find(placeholder, pos)) != std::string::npos) {
+			std::string escaped_val = escape(value);
+			text.replace(pos, placeholder.length(), escaped_val);
+			pos += escaped_val.length();
+		    }
+		}
+	    }
+	    for (auto& [k, v] : attributes) {
+		for (const auto& [key, value] : vars) {
+		    std::string placeholder = "{{" + key + "}}";
+		    size_t pos = 0;
+		    while ((pos = v.find(placeholder, pos)) != std::string::npos) {
+			v.replace(pos, placeholder.length(), value);
+			pos += value.length();
+		    }
+		}
+	    }
+	    for (auto& child : children) {
+		child.interpolate(vars);
+	    }
+	    return *this;
+	}
+
+	// --- rendering ---
 	std::string to_string(int level = 0) const {
 	    std::string out;
 
@@ -118,35 +250,25 @@ namespace htoop {
 	    }
 
 	    if (self_closing) {
-		// opening tag
 		out += indent(level) + "<" + tag;
-
 		for (const auto& [k, v] : attributes) {
 		    out += " " + k + "=\"" + v + "\"";
 		}
-
-		// closing tag
 		out += " />\n";
 		return out;
 	    }
 
-	    // opening tag
 	    out += indent(level) + "<" + tag;
-
 	    for (const auto& [k, v] : attributes) {
 		out += " " + k + "=\"" + v + "\"";
 	    }
-
 	    out += ">\n";
 
-	    // children
 	    for (const auto& child : children) {
 		out += child.to_string(level + 1);
 	    }
 
-	    // closing tag
 	    out += indent(level) + "</" + tag + ">\n";
-
 	    return out;
 	}
     };
@@ -157,25 +279,18 @@ namespace htoop {
 	std::string selector;
 	std::vector<std::pair<std::string, std::string>> properties;
     public:
-	// selector => Ex: body/h1/.class
-	CSSRule(std::string selector) {
-	    this->selector = selector;
-	}
+	explicit CSSRule(std::string selector) : selector(std::move(selector)) {}
 
-	// props => Ex: background = white
 	CSSRule& set(const std::string& key, const std::string& value) {
 	    properties.push_back({key, value});
 	    return *this;
 	}
 
-	// render
 	std::string to_string() const {
 	    std::string out = selector + " {\n";
-
 	    for (const auto& [k, v] : properties) {
 		out += "  " + k + ": " + v + ";\n";
 	    }
-
 	    out += "}\n";
 	    return out;
 	}
@@ -183,16 +298,13 @@ namespace htoop {
 
     class Stylesheet {
     private:
-	// collection of css groups
 	std::vector<CSSRule> rules;
     public:
 	CSSRule& select(const std::string& selector) {
-	    // creates CSSRule with selector arg
 	    rules.emplace_back(selector);
 	    return rules.back();
 	}
 
-	// render
 	std::string to_string() const {
 	    std::string out;
 	    for (const auto& rule : rules) {
@@ -205,25 +317,24 @@ namespace htoop {
 
 // --- HELPER FUNCTIONS ---
 
-    // Generic builder
     inline Node create(std::string tag, std::vector<Node> children = {}) {
-	Node n(tag);
+	Node n(std::move(tag));
 	for (auto& c : children) {
-	    n.append(c);
+	    n.append(std::move(c));
 	}
 	return n;
     }
 
     inline Node Html(std::vector<Node> children = {}) {
-	return create("html", children);
+	return create("html", std::move(children));
     }
 
     inline Node Body(std::vector<Node> children = {}) {
-	return create("body", children);
+	return create("body", std::move(children));
     }
 
     inline Node Head(std::vector<Node> children = {}) {
-	return create("head", children);
+	return create("head", std::move(children));
     }
 
     inline Node Title(const std::string& title) {
@@ -231,15 +342,15 @@ namespace htoop {
     }
 
     inline Node Script(std::vector<Node> children = {}) {
-	return create("script", children);
+	return create("script", std::move(children));
     }
 
-    inline Node Style(std::string css) {
-	return create("style", { Node::Text(css) });
+    inline Node Style(const std::string& css) {
+	return create("style", { Node::RawText(css) });
     }
 
     inline Node Div(std::vector<Node> children = {}) {
-	return create("div", children);
+	return create("div", std::move(children));
     }
 
     inline Node A(const std::string& text, const std::string& href) {
@@ -247,23 +358,35 @@ namespace htoop {
     }
 
     inline Node Header(std::vector<Node> children = {}) {
-	return create("header", children);
+	return create("header", std::move(children));
     }
 
     inline Node Footer(std::vector<Node> children = {}) {
-	return create("footer", children);
+	return create("footer", std::move(children));
     }
 
     inline Node Section(std::vector<Node> children = {}) {
-	return create("section", children);
+	return create("section", std::move(children));
     }
 
     inline Node Main(std::vector<Node> children = {}) {
-	return create("main", children);
+	return create("main", std::move(children));
     }
 
     inline Node H1(const std::string& text) {
 	return create("h1", { Node::Text(text) });
+    }
+
+    inline Node H2(const std::string& text) {
+	return create("h2", { Node::Text(text) });
+    }
+
+    inline Node H3(const std::string& text) {
+	return create("h3", { Node::Text(text) });
+    }
+
+    inline Node H4(const std::string& text) {
+	return create("h4", { Node::Text(text) });
     }
 
     inline Node P(const std::string& text) {
@@ -271,7 +394,7 @@ namespace htoop {
     }
 
     inline Node UL(std::vector<Node> children = {}) {
-	return create("ul", children);
+	return create("ul", std::move(children));
     }
 
     inline Node LI(const std::string& text) {
@@ -284,6 +407,44 @@ namespace htoop {
 
     inline Node IMG(const std::string& src) {
 	return Node::Self("img").attr("src", src);
+    }
+
+    // --- FORM ELEMENTS ---
+    inline Node Form(std::vector<Node> children = {}) {
+	return create("form", std::move(children));
+    }
+
+    inline Node Input(const std::string& type, const std::string& name, const std::string& value = "") {
+	Node input = Node::Self("input").attr("type", type).attr("name", name);
+	if (!value.empty()) {
+	    input.attr("value", value);
+	}
+	return input;
+    }
+
+    inline Node Label(const std::string& text, const std::string& for_id = "") {
+	Node label = create("label", { Node::Text(text) });
+	if (!for_id.empty()) {
+	    label.attr("for", for_id);
+	}
+	return label;
+    }
+
+    inline Node TextArea(const std::string& name, const std::string& placeholder = "") {
+	Node ta = create("textarea");
+	ta.attr("name", name);
+	if (!placeholder.empty()) {
+	    ta.attr("placeholder", placeholder);
+	}
+	return ta;
+    }
+
+    inline Node Select(const std::string& name, std::vector<Node> options = {}) {
+	return create("select", std::move(options)).attr("name", name);
+    }
+
+    inline Node Option(const std::string& value, const std::string& label_text) {
+	return create("option", { Node::Text(label_text) }).attr("value", value);
     }
 }
 
